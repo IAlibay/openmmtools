@@ -734,6 +734,7 @@ class MultiStateSampler(object):
            If specified, only at most the specified number of iterations
            will be run (default is None).
         """
+        import time
         # If this is the first iteration, compute and store the
         # starting energies of the minimized/equilibrated structures.
         if self._iteration == 0:
@@ -763,10 +764,20 @@ class MultiStateSampler(object):
         else:
             iteration_limit = min(self._iteration + n_iterations, self.number_of_iterations)
 
+        # timers
+        time_mixing = 0
+        time_propogate = 0
+        time_energies = 0
+        time_report = 0
+        time_analysis = 0
+        time_all = 0
+
         # Main loop.
         while not self._is_completed(iteration_limit):
             # Increment iteration counter.
             self._iteration += 1
+
+            t0_loop = time.time()
 
             logger.info('*' * 80)
             logger.info('Iteration {}/{}'.format(self._iteration, iteration_limit))
@@ -774,19 +785,29 @@ class MultiStateSampler(object):
             timer.start('Iteration')
 
             # Update thermodynamic states
+            t0 = time.time()
             self._replica_thermodynamic_states = self._mix_replicas()
+            time_mixing += time.time() - t0
 
             # Propagate replicas.
+            t0 = time.time()
             self._propagate_replicas()
+            time_propagate += time.time() - t0
 
             # Compute energies of all replicas at all states
+            t0 = time.time()
             self._compute_energies()
+            time_energies += time.time() - t0
 
             # Write iteration to storage file
+            t0 = time.time()
             self._report_iteration()
+            time_report += time.time() - t0
 
             # Update analysis
+            t0 = time.time()
             self._update_analysis()
+            time_analysis += time.time() - t0
 
             # Computing and transmitting timing information
             iteration_time = timer.stop('Iteration')
@@ -803,6 +824,10 @@ class MultiStateSampler(object):
 
             # Perform sanity checks to see if we should terminate here.
             self._check_nan_energy()
+            time_all += time.time() - t0_loop
+
+        print("Timings (mixing, propagate, energies, report, analysis, all): ", time_mixing, time_propagate, time_energies, time_report, time_analysis, time_all)
+
 
     def extend(self, n_iterations):
         """Extend the simulation by the given number of iterations.
